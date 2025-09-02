@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto"
+      xmlns:tools="http://schemas.android.com/tools"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:orientation="vertical"
+      android:padding="16dp"
+      android:background="@color/background_color"
+      tools:context=".MainActivity">
+
+      <!-- 标题 -->
+      <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="抖音视频下载器"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary_color"
+                android:gravity="center"
+                android:layout_marginBottom="32dp" />
+
+      <!-- TikTok图标 -->
+      <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_tiktok"
+                android:layout_marginBottom="24dp"
+                android:contentDescription="TikTok图标" />
+
+      <!-- 输入框标签 -->
+      <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="请粘贴抖音分享链接："
+                android:textSize="16sp"
+                android:textColor="@color/text_color"
+                android:layout_marginBottom="8dp" />
+
+      <!-- URL输入框 -->
+      <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:boxStrokeColor="@color/primary_color"
+                app:hintTextColor="@color/primary_color">
+
+                <com.google.android.material.textfield.TextInputEditText
+                              android:id="@+id/etUrl"
+                              android:layout_width="match_parent"
+                              android:layout_height="wrap_content"
+                              android:hint="例如：https://v.douyin.com/xxx"
+                              android:inputType="textUri"
+                              android:maxLines="3"
+                              android:textSize="14sp" />
+
+      </com.google.android.material.textfield.TextInputLayout>
+
+      <!-- 下载按钮 -->
+      <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDownload"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="下载视频"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/primary_color"
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="16dp" />
+
+      <!-- 进度条 -->
+      <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
+      <!-- 状态文本 -->
+      <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="14sp"
+                android:textColor="@color/text_color"
+                android:gravity="center"
+                android:visibility="gone"
+                android:layout_marginBottom="24dp" />
+
+      <!-- 使用说明 -->
+      <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="使用说明：\n1. 在抖音中找到想要下载的视频\n2. 点击分享按钮，复制链接\n3. 将链接粘贴到上方输入框\n4. 点击下载按钮即可保存到相册"
+                android:textSize="12sp"
+                android:textColor="@color/secondary_text_color"
+                android:lineSpacingExtra="4dp"
+                android:layout_marginTop="16dp" />
+
+      <!-- 免责声明 -->
+      <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⚠️ 仅供个人学习使用，请遵守相关法律法规"
+                android:textSize="10sp"
+                android:textColor="@color/warning_color"
+                android:gravity="center"
+                android:layout_marginTop="16dp"
+                android:background="@color/warning_background"
+                android:padding="8dp" />
+
+</LinearLayout>
