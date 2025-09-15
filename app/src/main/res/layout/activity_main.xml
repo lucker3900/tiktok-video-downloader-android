@@ -33,7 +33,7 @@
       <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="请粘贴抖音分享链接："
+                android:text="请粘贴完整的抖音分享文本："
                 android:textSize="16sp"
                 android:textColor="@color/text_color"
                 android:layout_marginBottom="8dp" />
@@ -50,7 +50,7 @@
                               android:id="@+id/etUrl"
                               android:layout_width="match_parent"
                               android:layout_height="wrap_content"
-                              android:hint="例如：https://v.douyin.com/xxx"
+                              android:hint="例如：3.35 复制打开抖音，看看【xxx】... https://v.douyin.com/xxx"
                               android:inputType="textUri"
                               android:maxLines="3"
                               android:textSize="14sp" />
@@ -94,7 +94,7 @@
       <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="使用说明：\n1. 在抖音中找到想要下载的视频\n2. 点击分享按钮，复制链接\n3. 将链接粘贴到上方输入框\n4. 点击下载按钮即可保存到相册"
+                android:text="使用说明：\n1. 在抖音中找到想要下载的视频\n2. 点击分享按钮，选择复制链接\n3. 将完整的分享文本粘贴到上方输入框\n4. 应用会自动提取视频链接并下载\n5. 视频将保存到相册的DouYin文件夹中"
                 android:textSize="12sp"
                 android:textColor="@color/secondary_text_color"
                 android:lineSpacingExtra="4dp"

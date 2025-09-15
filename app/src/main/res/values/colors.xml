@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#FF6200EE</color>
+    <color name="primary_dark">#FF3700B3</color>
+    <color name="accent">#FF03DAC5</color>
+    <color name="tiktok_red">#FF0050</color>
+    <color name="background">#FAFAFA</color>
+    
+    <!-- Activity Main Layout Colors -->
+    <color name="background_color">#FAFAFA</color>
+    <color name="primary_color">#FF0050</color>
+    <color name="text_color">#333333</color>
+    <color name="secondary_text_color">#666666</color>
+    <color name="warning_color">#FF6B35</color>
+    <color name="warning_background">#FFF3E0</color>
+</resources>

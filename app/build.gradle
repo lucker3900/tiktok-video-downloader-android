@@ -1,6 +1,7 @@
 plugins {
-      id 'com.android.application'
-      id 'org.jetbrains.kotlin.android'
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'kotlinx-serialization'
 }
 
 android {
@@ -39,12 +40,31 @@ android {
 }
 
 dependencies {
-      // Android Core
-      implementation 'androidx.core:core-ktx:1.12.0'
-      implementation 'androidx.appcompat:appcompat:1.6.1'
-      implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-      implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
-      implementation 'androidx.activity:activity-ktx:1.8.2'
+    // Android Core
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
 
-      // Material Design
-      implementation 'com.google.and
+    // Material Design
+    implementation 'com.google.android.material:material:1.10.0'
+    
+    // Network
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    
+    // JSON parsing
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0'
+    
+    // HTML parsing
+    implementation 'org.jsoup:jsoup:1.16.2'
+    
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}

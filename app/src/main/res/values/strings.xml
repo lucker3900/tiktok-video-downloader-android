@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">抖音视频下载器</string>
+    <string name="paste_link_hint">粘贴完整的抖音分享文本或链接</string>
+    <string name="download_button">下载视频</string>
+    <string name="downloading">正在下载...</string>
+    <string name="download_success">下载成功，已保存到相册</string>
+    <string name="download_failed">下载失败</string>
+    <string name="invalid_link">无效的抖音链接</string>
+    <string name="permission_denied">需要存储权限才能保存视频</string>
+</resources>
+
