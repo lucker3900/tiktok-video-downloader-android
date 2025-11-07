@@ -67,7 +67,19 @@
                 android:textStyle="bold"
                 app:backgroundTint="@color/primary_color"
                 app:cornerRadius="8dp"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="12dp" />
+
+      <!-- 配置按钮 -->
+      <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPeerConfig"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="配置临时鉴权参数"
+                android:textSize="14sp"
+                app:backgroundTint="@color/secondary_text_color"
+                android:textColor="@android:color/white"
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="20dp" />
 
       <!-- 进度条 -->
       <ProgressBar
@@ -88,7 +100,7 @@
                 android:textColor="@color/text_color"
                 android:gravity="center"
                 android:visibility="gone"
-                android:layout_marginBottom="24dp" />
+                android:layout_marginBottom="20dp" />
 
       <!-- 使用说明 -->
       <TextView

@@ -5,12 +5,15 @@ package com.tiktokdownloader
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -19,12 +22,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -39,6 +49,11 @@ import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.net.Uri
+import java.util.zip.GZIPInputStream
+import java.util.zip.InflaterInputStream
+import okhttp3.brotli.BrotliInterceptor
+import org.brotli.dec.BrotliInputStream
+import kotlin.LazyThreadSafetyMode
 
 class MainActivity : AppCompatActivity() {
     
@@ -76,12 +91,58 @@ class MainActivity : AppCompatActivity() {
             "install_id=7234567890123456789; ttreq=1\$abc12345",
             "s_v_web_id=verify_123abc456def; ttwid=1%7Cabc123def456"
         )
+
+        private const val BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+
+        private const val PREF_PEER_STORAGE = "peer_config_storage"
+        private const val KEY_PEER_TOKEN = "peer_token"
+        private const val KEY_PEER_TRACE_ID = "peer_trace_id"
+        private const val KEY_PEER_FID = "peer_fid"
+        private const val KEY_PEER_REQ_ID = "peer_req_id"
+        private const val KEY_PEER_APP_ID = "peer_app_id"
+        private const val KEY_PEER_COOKIE = "peer_cookie"
+        private const val PEER_ENDPOINT = "https://vc-gate-edge.ndcpp.com/sdk/get_peer"
     }
 
       private val client = OkHttpClient.Builder()
-              .connectTimeout(30, TimeUnit.SECONDS)
-                      .readTimeout(30, TimeUnit.SECONDS)
-                              .build()
+          .connectTimeout(30, TimeUnit.SECONDS)
+          .readTimeout(30, TimeUnit.SECONDS)
+          .retryOnConnectionFailure(true)
+          .addInterceptor(BrotliInterceptor)
+          .build()
+
+      private val peerPrefs: SharedPreferences by lazy(LazyThreadSafetyMode.NONE) {
+          getSharedPreferences(PREF_PEER_STORAGE, Context.MODE_PRIVATE)
+      }
+
+      private var peerConfig: PeerConfig = PeerConfig()
+
+      private data class PeerConfig(
+          val token: String = "",
+          val traceId: String = "",
+          val fid: String = "",
+          val reqId: String = "",
+          val cookie: String = "",
+          val appId: Int = 6383,
+          val sid: Int = 5,
+          val taskType: Int = 1,
+          val reqTimes: Int = 7,
+          val respTimes: Int = 7,
+          val nodeNum: Int = 5
+      ) {
+          fun isReady(): Boolean = token.isNotBlank() && traceId.isNotBlank() && fid.isNotBlank() && reqId.isNotBlank()
+
+          fun mergedCookie(latestCookie: String?): String? {
+              val cleaned = cookie.trim()
+              val latest = latestCookie?.trim().orEmpty()
+              return when {
+                  cleaned.isNotEmpty() && latest.isNotEmpty() -> "$cleaned; $latest"
+                  cleaned.isNotEmpty() -> cleaned
+                  latest.isNotEmpty() -> latest
+                  else -> null
+              }
+          }
+      }
 
                                       private val requestPermissionLauncher = registerForActivityResult(
                                                 ActivityResultContracts.RequestMultiplePermissions()
@@ -94,28 +155,222 @@ class MainActivity : AppCompatActivity() {
                                                         }
                                       }
 
-                                              override fun onCreate(savedInstanceState: Bundle?) {
-                                                        super.onCreate(savedInstanceState)
-                                                                setContentView(R.layout.activity_main)
-                                                                        setupClickListeners()
-                                              }
+      override fun onCreate(savedInstanceState: Bundle?) {
+          super.onCreate(savedInstanceState)
+          setContentView(R.layout.activity_main)
+          peerConfig = loadPeerConfig()
+          setupClickListeners()
+      }
 
-                                                      private fun setupClickListeners() {
-                                                                findViewById<android.widget.Button>(R.id.btnDownload).setOnClickListener {
-                                                                              val url = findViewById<android.widget.EditText>(R.id.etUrl).text.toString().trim()
-                                                                                          if (url.isEmpty()) {
-                                                                                                            showMessage("请输入抖音链接")
-                                                                                                                            return@setOnClickListener
-                                                                                          }
-                                                                                                      
-                                                                                                                  if (!isValidTikTokUrl(url)) {
-                                                                                                                                    showMessage("无效的抖音链接")
-                                                                                                                                                    return@setOnClickListener
-                                                                                                                  }
-                                                                                                                              
-                                                                                                                                          checkPermissionsAndDownload()
-                                                                }
-                                                      }
+      private fun setupClickListeners() {
+          findViewById<MaterialButton>(R.id.btnDownload).setOnClickListener {
+              val url = findViewById<TextInputEditText>(R.id.etUrl).text.toString().trim()
+              if (url.isEmpty()) {
+                  showMessage("请输入抖音链接")
+                  return@setOnClickListener
+              }
+
+              if (!isValidTikTokUrl(url)) {
+                  showMessage("无效的抖音链接")
+                  return@setOnClickListener
+              }
+
+              checkPermissionsAndDownload()
+          }
+
+          findViewById<MaterialButton>(R.id.btnPeerConfig).setOnClickListener {
+              showPeerConfigDialog()
+          }
+      }
+
+      private fun loadPeerConfig(): PeerConfig {
+          return PeerConfig(
+              token = peerPrefs.getString(KEY_PEER_TOKEN, "") ?: "",
+              traceId = peerPrefs.getString(KEY_PEER_TRACE_ID, "") ?: "",
+              fid = peerPrefs.getString(KEY_PEER_FID, "") ?: "",
+              reqId = peerPrefs.getString(KEY_PEER_REQ_ID, "") ?: "",
+              cookie = peerPrefs.getString(KEY_PEER_COOKIE, "") ?: "",
+              appId = peerPrefs.getInt(KEY_PEER_APP_ID, 6383)
+          )
+      }
+
+      private fun persistPeerConfig(config: PeerConfig) {
+          peerPrefs.edit()
+              .putString(KEY_PEER_TOKEN, config.token)
+              .putString(KEY_PEER_TRACE_ID, config.traceId)
+              .putString(KEY_PEER_FID, config.fid)
+              .putString(KEY_PEER_REQ_ID, config.reqId)
+              .putString(KEY_PEER_COOKIE, config.cookie)
+              .putInt(KEY_PEER_APP_ID, config.appId)
+              .apply()
+      }
+
+      private fun showPeerConfigDialog() {
+          val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_peer_config, null, false)
+          val tokenField = dialogView.findViewById<TextInputEditText>(R.id.etPeerToken)
+          val traceIdField = dialogView.findViewById<TextInputEditText>(R.id.etPeerTraceId)
+          val fidField = dialogView.findViewById<TextInputEditText>(R.id.etPeerFid)
+          val reqIdField = dialogView.findViewById<TextInputEditText>(R.id.etPeerReqId)
+          val appIdField = dialogView.findViewById<TextInputEditText>(R.id.etPeerAppId)
+          val cookieField = dialogView.findViewById<TextInputEditText>(R.id.etPeerCookie)
+
+          tokenField.setText(peerConfig.token)
+          traceIdField.setText(peerConfig.traceId)
+          fidField.setText(peerConfig.fid)
+          reqIdField.setText(peerConfig.reqId)
+          cookieField.setText(peerConfig.cookie)
+          if (peerConfig.appId != 6383) {
+              appIdField.setText(peerConfig.appId.toString())
+          }
+
+          MaterialAlertDialogBuilder(this)
+              .setTitle("配置临时鉴权参数")
+              .setView(dialogView)
+              .setPositiveButton("保存") { _, _ ->
+                  val updatedConfig = peerConfig.copy(
+                      token = tokenField.text?.toString()?.trim().orEmpty(),
+                      traceId = traceIdField.text?.toString()?.trim().orEmpty(),
+                      fid = fidField.text?.toString()?.trim().orEmpty(),
+                      reqId = reqIdField.text?.toString()?.trim().orEmpty(),
+                      cookie = cookieField.text?.toString()?.trim().orEmpty(),
+                      appId = appIdField.text?.toString()?.trim()?.toIntOrNull() ?: peerConfig.appId
+                  )
+                  peerConfig = updatedConfig
+                  persistPeerConfig(peerConfig)
+                  showMessage("鉴权参数已更新")
+              }
+              .setNeutralButton("清空") { _, _ ->
+                  peerConfig = PeerConfig()
+                  persistPeerConfig(peerConfig)
+                  showMessage("已清空临时参数")
+              }
+              .setNegativeButton("取消", null)
+              .show()
+      }
+
+      private fun buildPeerRequest(videoId: String, config: PeerConfig): Request? {
+          if (!config.isReady()) {
+              Log.d(TAG, "Peer 配置不完整，跳过 get_peer 请求")
+              return null
+          }
+
+          val payload = JSONObject().apply {
+              put("app_id", config.appId)
+              put("sid", config.sid)
+              put("task_type", config.taskType)
+              put("file_info", JSONObject().apply { put("vid", videoId) })
+              put("fid", config.fid)
+              put("req_id", config.reqId)
+              put("req_times", config.reqTimes)
+              put("resp_times", config.respTimes)
+              put("node_num", config.nodeNum)
+              put("client_info", JSONObject.NULL)
+              put("token", config.token)
+              put("trace_id", config.traceId)
+          }.toString()
+
+          val headersBuilder = Headers.Builder()
+              .add("accept", "*/*")
+              .add("accept-encoding", "gzip, deflate, br, zstd")
+              .add("accept-language", "zh-CN,zh;q=0.9,en;q=0.8")
+              .add("origin", "https://www.douyin.com")
+              .add("priority", "u=1, i")
+              .add("referer", "https://www.douyin.com/")
+              .add("sec-ch-ua", "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"")
+              .add("sec-ch-ua-mobile", "?0")
+              .add("sec-ch-ua-platform", "\"macOS\"")
+              .add("sec-fetch-dest", "empty")
+              .add("sec-fetch-mode", "cors")
+              .add("sec-fetch-site", "cross-site")
+              .add("user-agent", BROWSER_USER_AGENT)
+              .add("content-type", "text/plain;charset=UTF-8")
+
+          config.mergedCookie(latestCookie)?.let { cookieValue ->
+              if (cookieValue.isNotEmpty()) {
+                  headersBuilder.add("Cookie", cookieValue)
+              }
+          }
+
+          val requestBody: RequestBody = payload.toRequestBody("text/plain;charset=UTF-8".toMediaType())
+          return Request.Builder()
+              .url(PEER_ENDPOINT)
+              .headers(headersBuilder.build())
+              .post(requestBody)
+              .build()
+      }
+
+      private suspend fun requestPeerDownloadUrl(videoId: String): String? = withContext(Dispatchers.IO) {
+          val request = buildPeerRequest(videoId, peerConfig) ?: return@withContext null
+          try {
+              client.newCall(request).execute().use { response ->
+                  Log.d(TAG, "get_peer 响应状态: ${response.code}")
+                  if (!response.isSuccessful) {
+                      Log.w(TAG, "get_peer 请求失败: code=${response.code}")
+                      return@use null
+                  }
+
+                  val bodyText = decodeResponseBody(response)
+                  Log.d(TAG, "get_peer 响应片段: ${bodyText?.take(300)}")
+                  val directUrl = parsePeerResponse(bodyText)
+                  if (!directUrl.isNullOrBlank()) {
+                      Log.d(TAG, "get_peer 解析到直链: $directUrl")
+                  } else {
+                      Log.w(TAG, "get_peer 响应中未找到有效直链")
+                  }
+                  directUrl
+              }
+          } catch (e: Exception) {
+              Log.e(TAG, "get_peer 请求异常", e)
+              null
+          }
+      }
+
+      private fun parsePeerResponse(bodyText: String?): String? {
+          if (bodyText.isNullOrBlank()) return null
+          return try {
+              val root = JSONObject(bodyText)
+              locateUrlInJson(root)
+          } catch (e: JSONException) {
+              Log.w(TAG, "get_peer 响应非标准 JSON，尝试正则解析", e)
+              val regex = Regex("https?://[\\w./?=&%\\-]+", RegexOption.IGNORE_CASE)
+              regex.find(bodyText)?.value
+          }
+      }
+
+      private fun locateUrlInJson(node: Any?): String? {
+          return when (node) {
+              is JSONObject -> {
+                  val iterator = node.keys()
+                  while (iterator.hasNext()) {
+                      val key = iterator.next()
+                      val value = node.opt(key)
+                      if (key.contains("url", ignoreCase = true)) {
+                          when (value) {
+                              is String -> if (value.startsWith("http")) return value
+                              is JSONArray -> {
+                                  for (i in 0 until value.length()) {
+                                      val inner = value.optString(i)
+                                      if (inner.startsWith("http")) return inner
+                                  }
+                              }
+                          }
+                      }
+                      locateUrlInJson(value)?.let { return it }
+                  }
+                  null
+              }
+
+              is JSONArray -> {
+                  for (i in 0 until node.length()) {
+                      locateUrlInJson(node.opt(i))?.let { return it }
+                  }
+                  null
+              }
+
+              is String -> if (node.startsWith("http")) node else null
+              else -> null
+          }
+      }
 
                                                                     private fun isValidTikTokUrl(input: String): Boolean {
             // 先尝试从输入文本中提取URL
@@ -182,7 +437,7 @@ class MainActivity : AppCompatActivity() {
                                                                       }
 
                                                                                     private fun downloadVideo() {
-            val inputText = findViewById<android.widget.EditText>(R.id.etUrl).text.toString().trim()
+            val inputText = findViewById<TextInputEditText>(R.id.etUrl).text.toString().trim()
             Log.d(TAG, "开始下载视频，输入文本: $inputText")
             
             // 从输入文本中提取URL
@@ -270,6 +525,12 @@ class MainActivity : AppCompatActivity() {
                     Log.d(TAG, "从移动端API解析得到视频URL: $mobileVideoUrl")
                     return@withContext mobileVideoUrl
                 }
+
+                val peerVideoUrl = requestPeerDownloadUrl(videoId)
+                if (!peerVideoUrl.isNullOrEmpty()) {
+                    Log.d(TAG, "get_peer 返回直链: $peerVideoUrl")
+                    return@withContext peerVideoUrl
+                }
                 
                 // 第四步：直接访问网页并解析HTML（作为备用方案）
                 Log.d(TAG, "移动端API失败，尝试访问网页获取视频信息")
@@ -291,7 +552,7 @@ class MainActivity : AppCompatActivity() {
                     .build()
                     
                 val webPageResponse = client.newCall(webPageRequest).execute()
-                val htmlContent = webPageResponse.body?.string()
+                val htmlContent = decodeResponseBody(webPageResponse)
                 Log.d(TAG, "网页响应状态: ${webPageResponse.code}")
                 Log.d(TAG, "网页响应长度: ${htmlContent?.length ?: 0}")
                 webPageResponse.close()
@@ -374,7 +635,7 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "API响应状态 ($apiUrl): ${apiResponse.code}")
                         
                         if (apiResponse.isSuccessful) {
-                            val responseData = apiResponse.body?.string()
+                            val responseData = decodeResponseBody(apiResponse)
                             Log.d(TAG, "端点 $apiUrl 响应长度: ${responseData?.length ?: 0}")
                             
                             // 检查响应是否为空或无效
@@ -648,7 +909,7 @@ class MainActivity : AppCompatActivity() {
                       Log.d(TAG, "第三方API响应状态 (${service.name}): ${response.code}")
                       
                       if (response.isSuccessful) {
-                          val responseData = response.body?.string()
+                          val responseData = decodeResponseBody(response)
                           Log.d(TAG, "${service.name} 响应长度: ${responseData?.length ?: 0}")
                           
                           if (!responseData.isNullOrEmpty()) {
@@ -874,7 +1135,7 @@ class MainActivity : AppCompatActivity() {
                       Log.d(TAG, "移动端API响应状态 ($apiUrl): ${response.code}")
                       
                       if (response.isSuccessful) {
-                          val responseData = response.body?.string()
+                          val responseData = decodeResponseBody(response)
                           Log.d(TAG, "移动端API响应长度: ${responseData?.length ?: 0}")
                           
                           if (!responseData.isNullOrEmpty() && responseData.trim().isNotEmpty()) {
@@ -973,6 +1234,14 @@ class MainActivity : AppCompatActivity() {
               var isFinished = false
               
               webView.webViewClient = object : WebViewClient() {
+                  override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                      val targetUrl = request?.url?.toString().orEmpty()
+                      if (targetUrl.startsWith("snssdk") || targetUrl.startsWith("aweme")) {
+                          Log.d(TAG, "忽略自定义Schema跳转: $targetUrl")
+                          return true
+                      }
+                      return false
+                  }
                   override fun onPageFinished(view: WebView?, url: String?) {
                       Log.d(TAG, "WebView页面加载完成")
                       
@@ -1467,7 +1736,7 @@ class MainActivity : AppCompatActivity() {
                         .addHeader("Accept", "video/mp4,video/*,*/*")
                         .addHeader("Accept-Encoding", "identity")
                         .addHeader("Connection", "keep-alive")
-                    latestCookie?.let { b.addHeader("Cookie", it) }
+                    peerConfig.mergedCookie(latestCookie)?.let { b.addHeader("Cookie", it) }
                     extra.forEach { (k, v) -> b.addHeader(k, v) }
                     return b.build()
                 }
@@ -1494,12 +1763,13 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 var response = follow(videoUrl)
-                if (!response.isSuccessful || response.body == null) {
+                val emptyBody = response.body?.contentLength() == 0L
+                if (!response.isSuccessful || response.body == null || emptyBody) {
                     response.close()
-                    Log.w(TAG, "直下失败，尝试 Range 方式")
+                    Log.w(TAG, "直下失败或长度为0，尝试携带Range重试")
                     response = client.newCall(buildReq(videoUrl, mapOf("Range" to "bytes=0-"))).execute()
-                    val cl2 = response.header("Content-Length")
-                    Log.d(TAG, "Range 响应: code=${response.code}, content-length=${cl2 ?: "<none>"}")
+                    val cl2 = response.header("Content-Length") ?: response.header("Content-Range")
+                    Log.d(TAG, "Range 响应: code=${response.code}, content-info=${cl2 ?: "<none>"}")
                     if (!response.isSuccessful || response.body == null) {
                         response.close()
                         return@withContext false
@@ -1556,6 +1826,28 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "下载保存异常", e)
                 return@withContext false
             }
+      }
+
+      /**
+       * 解码支持 gzip/deflate 的 HTTP 响应体，返回 UTF-8 文本用于后续 JSON 解析。
+       */
+      private fun decodeResponseBody(response: okhttp3.Response): String? {
+          val body = response.body ?: return null
+          return try {
+              val encoding = response.header("Content-Encoding")?.lowercase()
+              val text = when (encoding) {
+                  "gzip" -> GZIPInputStream(body.byteStream()).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                  "deflate" -> InflaterInputStream(body.byteStream()).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                  "br" -> BrotliInputStream(body.byteStream()).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                  else -> body.charStream().use { it.readText() }
+              }
+              body.close()
+              text
+          } catch (e: Exception) {
+              Log.e(TAG, "响应解压失败", e)
+              body.close()
+              null
+          }
       }
                                                                                                           
                                                                                                               private fun showLoading(show: Boolean) {
@@ -1625,7 +1917,7 @@ class MainActivity : AppCompatActivity() {
         
         return builder.build()
     }
-    
+
     /**
      * 生成追踪ID
      */
@@ -1823,6 +2115,14 @@ class MainActivity : AppCompatActivity() {
             var captured: String? = null
             var finished = false
             webView.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val targetUrl = request?.url?.toString().orEmpty()
+                    if (targetUrl.startsWith("snssdk") || targetUrl.startsWith("aweme")) {
+                        Log.d(TAG, "忽略自定义Schema跳转: $targetUrl")
+                        return true
+                    }
+                    return false
+                }
                 override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                     try {
                         val u = request?.url?.toString().orEmpty()
